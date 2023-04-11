@@ -136,10 +136,10 @@ def ncplot(argv):
         cmap.set_bad('black', 1.)
 
         if args.hide_cbar:
-            pm = image.plot(subplot_kws=dict(projection=map_proj), add_colorbar=True,
+            pm = image.plot(subplot_kws=dict(projection=map_proj), add_colorbar=False,
                         cmap=new_cmap, norm=norm, cbar_kwargs={'label': args.cblabel})
         else:
-            pm = image.plot(subplot_kws=dict(projection=map_proj), add_colorbar=False,
+            pm = image.plot(subplot_kws=dict(projection=map_proj), add_colorbar=True,
                         cmap=new_cmap, norm=norm)
         ax = plt.gca()
 
@@ -160,12 +160,12 @@ def ncplot(argv):
                     surround_country_records.append(record)
         # Display Kenya's shape
         shape_feature = ShapelyFeature([germany.geometry], ccrs.PlateCarree(), facecolor="white", edgecolor='darkgray',
-                                       lw=1, alpha=0.3)
+                                       lw=1, alpha=0.0)
         ax.add_feature(shape_feature)
 
         for record in surround_country_records:
             shape_feature = ShapelyFeature([record.geometry], ccrs.PlateCarree(), facecolor="gray", edgecolor='darkgray',
-                                           lw=1, alpha=0.3)
+                                           lw=1, alpha=0.2)
             ax.add_feature(shape_feature)
         ax.add_feature(cartopy.feature.OCEAN)
 

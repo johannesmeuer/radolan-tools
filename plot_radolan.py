@@ -101,8 +101,9 @@ def ncplot(argv):
         "#1f0a2e",  # 10.00+
     ]
     precip_colormap = matplotlib.colors.ListedColormap(nws_precip_colors)
-    levels = [0.01, 0.1, 0.25, 0.50, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0,
+    levels = [0.13, 0.2, 0.25, 0.50, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0,
               6.0, 8.0, 10.]
+    #levels = [20*level for level in levels]
     norm = matplotlib.colors.BoundaryNorm(levels, 15)
     plt.rcParams.update({'font.size': 20})
     plt.rcParams.update({'font.family': "serif"})
@@ -168,6 +169,20 @@ def ncplot(argv):
                                            lw=1, alpha=0.2)
             ax.add_feature(shape_feature)
         ax.add_feature(cartopy.feature.OCEAN)
+
+        #plt.axes(projection=ccrs.PlateCarree())
+
+        ahrweiler_latitude = 50.54
+        ahrweiler_longitude = 7.09
+
+        # Convert lon-lat to the specified projection
+        lon_lat_point = map_proj.transform_point(ahrweiler_longitude, ahrweiler_latitude, ccrs.PlateCarree())
+
+        # Add a marker at the converted lon-lat point
+        #ax.scatter(lon_lat_point[0], lon_lat_point[1], marker='o', color='red', label='Marker Label')
+
+        plt.scatter(lon_lat_point[0], lon_lat_point[1], marker='o', color='black', label='Marker Label', s=200)
+        plt.text(lon_lat_point[0] + 30000, lon_lat_point[1], 'Ahrweiler')
 
         ax.add_feature(cartopy.feature.COASTLINE, edgecolor="darkgray", linewidth=1)
         ax.add_feature(cartopy.feature.BORDERS, color="darkgray", linewidth=1)

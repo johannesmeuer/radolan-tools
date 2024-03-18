@@ -7,7 +7,6 @@ import imageio
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import wradlib as wrl
 import xarray
 from cartopy.feature import ShapelyFeature
 from matplotlib.colors import ListedColormap
@@ -15,11 +14,6 @@ from scipy import ndimage
 
 from utils import get_ndat, parse_slops
 import cartopy.io.shapereader as shpreader
-
-
-def read_radolan(radfile):
-    radfile = wrl.util.get_wradlib_data_file("" + radfile)
-    return wrl.io.open_radolan_dataset(radfile)
 
 
 def parse_title(title):

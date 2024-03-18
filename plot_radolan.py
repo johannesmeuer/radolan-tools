@@ -139,7 +139,6 @@ def ncplot(argv):
             pm = image.plot(subplot_kws=dict(projection=map_proj), add_colorbar=True,
                         cmap=new_cmap, norm=norm)
         ax = plt.gca()
-        ax.add_feature(cartopy.feature.OCEAN)
 
         # Read Natural Earth data
         shpfilename = shpreader.natural_earth(resolution='10m',
@@ -172,17 +171,17 @@ def ncplot(argv):
 
         #plt.axes(projection=ccrs.PlateCarree())
 
-        ahrweiler_latitude = 50.54
-        ahrweiler_longitude = 7.09
+        #ahrweiler_latitude = 50.54
+        #ahrweiler_longitude = 7.09
 
         # Convert lon-lat to the specified projection
-        lon_lat_point = map_proj.transform_point(ahrweiler_longitude, ahrweiler_latitude, ccrs.PlateCarree())
+        #lon_lat_point = map_proj.transform_point(ahrweiler_longitude, ahrweiler_latitude, ccrs.PlateCarree())
 
         # Add a marker at the converted lon-lat point
         #ax.scatter(lon_lat_point[0], lon_lat_point[1], marker='o', color='red', label='Marker Label')
 
-        plt.scatter(lon_lat_point[0], lon_lat_point[1], marker='o', color='black', label='Marker Label', s=200)
-        plt.text(lon_lat_point[0] + 30000, lon_lat_point[1], 'Ahrweiler')
+        #plt.scatter(lon_lat_point[0], lon_lat_point[1], marker='o', color='black', label='Marker Label', s=200)
+        #plt.text(lon_lat_point[0] + 30000, lon_lat_point[1], 'Ahrweiler')
 
         ax.add_feature(cartopy.feature.COASTLINE, edgecolor="darkgray", linewidth=1)
         ax.add_feature(cartopy.feature.BORDERS, color="darkgray", linewidth=1)

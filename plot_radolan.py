@@ -11,6 +11,7 @@ import xarray
 from cartopy.feature import ShapelyFeature
 from matplotlib.colors import ListedColormap
 from scipy import ndimage
+import geopandas as gpd
 
 from utils import get_ndat, parse_slops
 import cartopy.io.shapereader as shpreader
@@ -55,6 +56,7 @@ def ncplot(argv):
     parser.add_argument("-m", "--maskval", type=float_list, default=None,
                         help="Mask the values between val1 and val2 (val1,val2)")
     parser.add_argument("--fps", type=int, default=5, help="Number of rows for the 2d plots")
+    parser.add_argument("--factor", type=int, default=1, help="Number of rows for the 2d plots")
     parser.add_argument("--hide-cbar", action='store_true', help="Hide colorbars")
     parser.add_argument("--hide-axes", action='store_true', help="Hide axes")
     parser.add_argument("--skip-checks", action='store_true', help="Skip the checks")
@@ -109,7 +111,7 @@ def ncplot(argv):
     for i in indices:
         fig = plt.figure(figsize=(10, 8))
 
-        image = images.ds.pr.isel(time=i)
+        image = images.ds.pr.isel(time=i) * args.factor
         mask = np.isnan(image)
         new_mask = ndimage.binary_dilation(mask, iterations=4)
         mask = np.logical_xor(new_mask, mask)
@@ -136,6 +138,7 @@ def ncplot(argv):
             pm = image.plot(subplot_kws=dict(projection=map_proj), add_colorbar=True,
                         cmap=new_cmap, norm=norm)
         ax = plt.gca()
+        ax.add_feature(cartopy.feature.OCEAN)
 
         # Read Natural Earth data
         shpfilename = shpreader.natural_earth(resolution='10m',
@@ -161,7 +164,10 @@ def ncplot(argv):
             shape_feature = ShapelyFeature([record.geometry], ccrs.PlateCarree(), facecolor="gray", edgecolor='darkgray',
                                            lw=1, alpha=0.2)
             ax.add_feature(shape_feature)
-        ax.add_feature(cartopy.feature.OCEAN)
+
+        ahrtal = gpd.read_file("../../data/ahrtal/Ahrtal-Einzugsgebiet/Ahrtal.shp")
+        ax.add_geometries(ahrtal.geometry, crs=ccrs.PlateCarree(), hatch=r"\\\\\\", facecolor="None",
+                          edgecolor='black', zorder=5)
 
         ax.add_feature(cartopy.feature.COASTLINE, edgecolor="darkgray", linewidth=1)
         ax.add_feature(cartopy.feature.BORDERS, color="darkgray", linewidth=1)

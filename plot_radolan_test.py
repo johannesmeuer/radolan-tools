@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xarray
 from cartopy.feature import ShapelyFeature
-from cartopy.mpl.patch import geos_to_path
+from cartopy.mpl.geoaxes import GeoAxes
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import PathPatch, Patch
 from scipy import ndimage
@@ -69,10 +69,9 @@ def ncplot(argv):
     parser.add_argument("--exp", type=str, default=None, help="Export as filename")
     args = parser.parse_args(argv)
     slops_dict = parse_slops(argv)
-
-    images = get_ndat(args.fnames, selvars=args.selvars, dim_names=args.dim_names, maskval=args.maskval,
+    images = [get_ndat([args.fnames[i]], selvars=args.selvars, dim_names=args.dim_names, maskval=args.maskval,
                       lib="xarray", slops_dict=slops_dict,
-                      skip_checks=args.skip_checks)
+                      skip_checks=args.skip_checks) for i in range(len(args.fnames))]
     if args.masknames:
         masks = get_ndat(args.masknames, selvars=args.selvars, dim_names=args.dim_names, maskval=args.maskval,
                          verbose=args.verbose, lib="xarray", slops_dict=slops_dict,
@@ -104,7 +103,7 @@ def ncplot(argv):
     levels = [0.13, 0.2, 0.25, 0.50, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0,
               6.0, 8.0, 10.]
     if args.sum:
-        levels = [13*level for level in levels]
+        levels = [20*level for level in levels]
     norm = matplotlib.colors.BoundaryNorm(levels, 15)
     plt.rcParams.update({'font.size': 20})
     plt.rcParams.update({'font.family': "serif"})
@@ -114,79 +113,83 @@ def ncplot(argv):
     elif args.indices:
         indices = args.indices
     else:
-        indices = range(images.ds.pr.shape[0])
+        indices = range(images[0].ds.pr.shape[0])
 
     for i in indices:
-        fig = plt.figure(figsize=(10, 8))
-        image = images.ds.pr.isel(time=i) * args.factor
+        fig, axes = plt.subplots(1, len(images), figsize=(16, len(images)*8), subplot_kw=dict(projection=map_proj))
 
-        if args.sum:
-            sums = 0.0
-            for x in range(images.ds.pr.shape[0]-1):
-                sums += images.ds.pr.isel(time=x+1)
-            image = image + sums * args.factor
+        for j in range(len(images)):
+            if isinstance(axes, GeoAxes):
+                ax = axes
+            else:
+                ax = axes[j]
+            image = images[j].ds.pr.isel(time=i) * args.factor
 
-        mask = np.isnan(image)
-        new_mask = ndimage.binary_dilation(mask, iterations=4)
-        mask = np.logical_xor(new_mask, mask)
+            if args.sum:
+                sums = 0.0
+                for x in range(images[j].ds.pr.shape[0]-1):
+                    sums += images[j].ds.pr.isel(time=x+1)
+                image = image + sums * args.factor
 
-        image = image.fillna(0)
-        image = xarray.where(image < 0, 0, image)
-        image = image.where(mask == False)
+            mask = np.isnan(image)
+            new_mask = ndimage.binary_dilation(mask, iterations=4)
+            mask = np.logical_xor(new_mask, mask)
 
-        if args.masknames:
-            image = image.where(masks.ds.pr.isel(time=0) == 0)
+            image = image.fillna(0)
+            image = xarray.where(image < 0, 0, image)
+            image = image.where(mask == False)
 
-        cmap = precip_colormap
-        new_cmap = cmap(np.arange(cmap.N))
-        new_cmap[:, -1] = np.ones(cmap.N)
-        new_cmap[:, -1][0] = 0
-        new_cmap = ListedColormap(new_cmap)
-        new_cmap.set_bad('black', 1.)
-        cmap.set_bad('black', 1.)
+            if args.masknames:
+                image = image.where(masks.ds.pr.isel(time=0) == 0)
 
-        if args.hide_cbar:
-            pm = image.plot(subplot_kws=dict(projection=map_proj), add_colorbar=False,
-                        cmap=new_cmap, norm=norm)
-        else:
-            pm = image.plot(subplot_kws=dict(projection=map_proj), add_colorbar=True,
-                        cmap=new_cmap, norm=norm, cbar_kwargs={'label': "mm/h" if not args.sum else "mm (accumulated)"})
-        ax = plt.gca()
+            cmap = precip_colormap
+            new_cmap = cmap(np.arange(cmap.N))
+            new_cmap[:, -1] = np.ones(cmap.N)
+            new_cmap[:, -1][0] = 0
+            new_cmap = ListedColormap(new_cmap)
+            new_cmap.set_bad('black', 1.)
+            cmap.set_bad('black', 1.)
 
-        # Read Natural Earth data
-        shpfilename = shpreader.natural_earth(resolution='10m',
-                                              category='cultural',
-                                              name='admin_0_countries')
-        reader = shpreader.Reader(shpfilename)
-        surround_countries = ["Belgium", "Netherlands", "Denmark", "Italy", "Switzerland", "Poland", "Czech Republic",
-                              "Luxembourg", "France", "Sweden", "Austria", "Slovenia"]
-        surround_country_records = []
-        germany = None
-        for record in reader.records():
-            if "Germany" in record.attributes["NAME_LONG"]:
-                germany = record
-            for country in surround_countries:
-                if country in record.attributes["NAME_LONG"]:
-                    surround_country_records.append(record)
-        # Display Kenya's shape
-        shape_feature = ShapelyFeature([germany.geometry], ccrs.PlateCarree(), facecolor="white", edgecolor='darkgray',
-                                       lw=1, alpha=0.0)
-        ax.add_feature(shape_feature)
+            pm = ax.pcolormesh(image.coords['lon'], image.coords['lat'], image, cmap=new_cmap, norm=norm, transform=ccrs.PlateCarree())
 
-        for record in surround_country_records:
-            shape_feature = ShapelyFeature([record.geometry], ccrs.PlateCarree(), facecolor="gray", edgecolor='darkgray',
-                                           lw=1, alpha=0.2)
+            # Read Natural Earth data
+            shpfilename = shpreader.natural_earth(resolution='10m',
+                                                  category='cultural',
+                                                  name='admin_0_countries')
+            reader = shpreader.Reader(shpfilename)
+            surround_countries = ["Belgium", "Netherlands", "Denmark", "Italy", "Switzerland", "Poland", "Czech Republic",
+                                  "Luxembourg", "France", "Sweden", "Austria", "Slovenia"]
+            surround_country_records = []
+            germany = None
+            for record in reader.records():
+                if "Germany" in record.attributes["NAME_LONG"]:
+                    germany = record
+                for country in surround_countries:
+                    if country in record.attributes["NAME_LONG"]:
+                        surround_country_records.append(record)
+            # Display Kenya's shape
+            shape_feature = ShapelyFeature([germany.geometry], ccrs.PlateCarree(), facecolor="white", edgecolor='darkgray',
+                                           lw=1, alpha=0.0)
             ax.add_feature(shape_feature)
 
-        ahrtal = gpd.read_file("../../data/ahrtal/Ahrtal-Einzugsgebiet/Ahrtal.shp")
-        for geom in ahrtal.geometry:
-            ax.add_geometries([geom], crs=ccrs.PlateCarree(), hatch='////', facecolor="lightgray", edgecolor='black',
-                              zorder=5)
-        legend_entry = Patch(facecolor="lightgray", edgecolor="black", hatch="////", label="Ahr River Basin")
-        ax.legend(handles=[legend_entry], loc='upper left', prop={'size': 18})
+            for record in surround_country_records:
+                shape_feature = ShapelyFeature([record.geometry], ccrs.PlateCarree(), facecolor="gray", edgecolor='darkgray',
+                                               lw=1, alpha=0.2)
+                ax.add_feature(shape_feature)
 
-        ax.add_feature(cartopy.feature.COASTLINE, edgecolor="darkgray", linewidth=1)
-        ax.add_feature(cartopy.feature.BORDERS, color="darkgray", linewidth=1)
+            ahrtal = gpd.read_file("../../data/ahrtal/Ahrtal-Einzugsgebiet/Ahrtal.shp")
+            for geom in ahrtal.geometry:
+                ax.add_geometries([geom], crs=ccrs.PlateCarree(), hatch='//////', facecolor="lightgray", edgecolor='black',
+                                  zorder=5)
+            legend_entry = Patch(facecolor="lightgray", edgecolor="black", hatch="//////", label="River Basin Ahr")
+            ax.legend(handles=[legend_entry], loc='upper left', prop={'size': 14})
+
+            ax.add_feature(cartopy.feature.COASTLINE, edgecolor="darkgray", linewidth=1)
+            ax.add_feature(cartopy.feature.BORDERS, color="darkgray", linewidth=1)
+
+        #fig.subplots_adjust(right=0.8)
+        #cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+        #fig.colorbar(pm, cax=cbar_ax, fraction=0.046, pad=0.04)
 
         if args.title:
             ax.set_title(args.title)
@@ -194,31 +197,6 @@ def ncplot(argv):
             ax.set_title("")
 
         plt.savefig("{}{}.png".format(args.exp, i), bbox_inches='tight', dpi=300)
-
-        # get ahrtal values
-        import rasterio
-        from rasterio import features
-        from shapely.geometry import mapping
-        import xarray as xr
-
-        image_array = image.values
-
-        # Load the Ahrtal shapefile using geopandas
-        ahrtal_shape = gpd.read_file("../../data/ahrtal/Ahrtal-Einzugsgebiet/Ahrtal.shp")
-
-        # Reproject Ahrtal shape to match image projection if needed
-        # Assuming image has PlateCarree projection
-        ahrtal_shape = ahrtal_shape.to_crs(images.ds.crs)
-
-        # Convert Ahrtal shape to GeoJSON format
-        ahrtal_geojson = mapping(ahrtal_shape.geometry[0])
-
-        # Use rasterio.mask.mask to mask the image with the Ahrtal shape
-        masked_image, transform = rasterio.mask.mask(rasterio.open("path/to/your/raster/file.tif"), [ahrtal_geojson],
-                                                     crop=True)
-
-        # Convert the masked image back to xarray DataArray
-        masked_image = xr.DataArray(masked_image[0], coords=image.coords, dims=image.dims)
 
     if args.create_vid:
         with imageio.get_writer('{}.gif'.format(args.exp), mode='I', fps=args.fps) as writer:

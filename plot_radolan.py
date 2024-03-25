@@ -14,6 +14,7 @@ from matplotlib.colors import ListedColormap
 from matplotlib.patches import PathPatch, Patch
 from scipy import ndimage
 import geopandas as gpd
+import xarray as xr
 
 from utils import get_ndat, parse_slops
 import cartopy.io.shapereader as shpreader
@@ -104,7 +105,7 @@ def ncplot(argv):
     levels = [0.13, 0.2, 0.25, 0.50, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0,
               6.0, 8.0, 10.]
     if args.sum:
-        levels = [13*level for level in levels]
+        levels = [12.5*level for level in levels]
     norm = matplotlib.colors.BoundaryNorm(levels, 15)
     plt.rcParams.update({'font.size': 20})
     plt.rcParams.update({'font.family': "serif"})
@@ -144,7 +145,7 @@ def ncplot(argv):
         new_cmap = ListedColormap(new_cmap)
         new_cmap.set_bad('black', 1.)
         cmap.set_bad('black', 1.)
-
+        image = image[300:700, :400]
         if args.hide_cbar:
             pm = image.plot(subplot_kws=dict(projection=map_proj), add_colorbar=False,
                         cmap=new_cmap, norm=norm)
@@ -180,9 +181,9 @@ def ncplot(argv):
 
         ahrtal = gpd.read_file("../../data/ahrtal/Ahrtal-Einzugsgebiet/Ahrtal.shp")
         for geom in ahrtal.geometry:
-            ax.add_geometries([geom], crs=ccrs.PlateCarree(), hatch='////', facecolor="lightgray", edgecolor='black',
-                              zorder=5)
-        legend_entry = Patch(facecolor="lightgray", edgecolor="black", hatch="////", label="Ahr River Basin")
+            ax.add_geometries([geom], crs=ccrs.PlateCarree(), facecolor="none", edgecolor='gray',
+                              zorder=5, linewidth=3)
+        legend_entry = Patch(facecolor="none", edgecolor="gray", label="Ahr River Basin", linewidth=3)
         ax.legend(handles=[legend_entry], loc='upper left', prop={'size': 18})
 
         ax.add_feature(cartopy.feature.COASTLINE, edgecolor="darkgray", linewidth=1)
@@ -195,30 +196,19 @@ def ncplot(argv):
 
         plt.savefig("{}{}.png".format(args.exp, i), bbox_inches='tight', dpi=300)
 
-        # get ahrtal values
-        import rasterio
-        from rasterio import features
-        from shapely.geometry import mapping
+        # Read the shapefile
+        import rasterio.mask
         import xarray as xr
 
-        image_array = image.values
+        # Assuming your geometry is a GeoDataFrame
+        # and your xarray dataset is loaded
+        geometry = gpd.read_file('../../data/ahrtal/Ahrtal-Einzugsgebiet/Ahrtal.shp')
+        import rioxarray
 
-        # Load the Ahrtal shapefile using geopandas
-        ahrtal_shape = gpd.read_file("../../data/ahrtal/Ahrtal-Einzugsgebiet/Ahrtal.shp")
-
-        # Reproject Ahrtal shape to match image projection if needed
-        # Assuming image has PlateCarree projection
-        ahrtal_shape = ahrtal_shape.to_crs(images.ds.crs)
-
-        # Convert Ahrtal shape to GeoJSON format
-        ahrtal_geojson = mapping(ahrtal_shape.geometry[0])
-
-        # Use rasterio.mask.mask to mask the image with the Ahrtal shape
-        masked_image, transform = rasterio.mask.mask(rasterio.open("path/to/your/raster/file.tif"), [ahrtal_geojson],
-                                                     crop=True)
-
-        # Convert the masked image back to xarray DataArray
-        masked_image = xr.DataArray(masked_image[0], coords=image.coords, dims=image.dims)
+        xds = rioxarray.open_rasterio("../../data/ahrtal/ahrtal_gt.nc")[0]
+        xds.rio.write_crs("epsg:4326", inplace=True)
+        xds.rio.set_spatial_dims(x_dim="lon", y_dim="lat", inplace=True)
+        clipped = xds.rio.clip(geometry.geometry.values, geometry.crs)
 
     if args.create_vid:
         with imageio.get_writer('{}.gif'.format(args.exp), mode='I', fps=args.fps) as writer:
